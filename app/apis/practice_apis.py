@@ -1,7 +1,8 @@
 from fastapi import APIRouter
 
-router = APIRouter(prefix="/practice_api", tags=["Practice API"])
+from app.apis import update_user
 
+router = APIRouter(prefix="/practice_api", tags=["Practice API"])
 
 user_list = [
     {
@@ -26,3 +27,5 @@ user_list = [
         "password": "IwsPAssword12@"
     }
 ]
+
+router.include_router(update_user.router)
