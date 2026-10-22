@@ -1,4 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Body, HTTPException, status
+from pydantic import BaseModel
+
 
 router = APIRouter(prefix="/practice_api", tags=["Practice API"])
 
@@ -28,18 +30,16 @@ user_list = [
 ]
 
 
+# =========================================================
 # 회원 추가 API (구민준 작업)
+# =========================================================
 
-# 추가 라이브러리 호출
-from fastapi import Body, HTTPException, status
-from pydantic import BaseModel
-
-# 클래스 설정
 class CreateUserRequest(BaseModel):
     name: str
     age: int
     email: str
     password: str
+
 
 @router.post(
     "/users",
@@ -63,22 +63,21 @@ def create_user_handler(
             detail="최소 14세 이상",
         )
 
-    # 이메일 제한 사항들
-    # 최대 30자 제한
+    # 이메일 최대 30자 제한
     if len(body.email) > 30:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="최대 30자",
         )
 
-    # 형식 확인 (@ . 포함 여부)
+    # 이메일 형식 확인 (@, . 포함 여부)
     if "@" not in body.email or "." not in body.email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="올바른 이메일 형식이 아님",
         )
 
-    # 중복 검사
+    # 이메일 중복 검사
     for user in user_list:
         if user["email"] == body.email:
             raise HTTPException(
@@ -86,15 +85,14 @@ def create_user_handler(
                 detail="이미 존재하는 이메일",
             )
 
-    # 비밀번호 확인
-    # 길이 제한 (8자 이상, 20자 이하)
+    # 비밀번호 길이 제한 (8자 이상, 20자 이하)
     if len(body.password) < 8 or len(body.password) > 20:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="최소 8자, 최대 20자",
         )
 
-    # 대문자, 소문자, 특수문자 포함 여부(flag 변수로 하나씩 확인)
+    # 대문자, 소문자, 특수문자 포함 여부 확인
     has_upper = False
     has_lower = False
     has_special = False
@@ -102,40 +100,44 @@ def create_user_handler(
     special_characters = "!@#$%^&*()-_=+[]{}|;:'\",.<>?/`~"
 
     for char in body.password:
-        if char.isupper():  # 대문자인지 확인
+        if char.isupper():
             has_upper = True
-        elif char.islower():  # 소문자인지 확인
+        elif char.islower():
             has_lower = True
-        elif char in special_characters:  # 특수문자 리스트에 들어있는지 확인
+        elif char in special_characters:
             has_special = True
 
-    # 셋 중 하나라도 False면 에러 발생
     if not has_upper:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="대문자 최소 1개 포함",
         )
+
     if not has_lower:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="소문자 최소 1개 포함",
         )
+
     if not has_special:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="특수문자가 최소 1개 포함",
         )
 
-    # id 자동 증가 계산 (기존 목록 중 가장 큰 id를 찾아 +1)
+    # 새로운 회원 ID 생성
     new_id = 1
+
     if len(user_list) > 0:
         max_id = 0
+
         for user in user_list:
             if user["id"] > max_id:
                 max_id = user["id"]
+
         new_id = max_id + 1
 
-    # 6. user_list에 추가 (dict 생성)
+    # 새로운 회원 정보 생성
     new_user = {
         "id": new_id,
         "name": body.name,
@@ -143,9 +145,11 @@ def create_user_handler(
         "email": body.email,
         "password": body.password,
     }
+
+    # 회원 목록에 추가
     user_list.append(new_user)
 
-    # 7. 성공 메세지
+    # 성공 응답
     return {
         "message": "회원이 성공적으로 등록되었습니다.",
         "user": {
@@ -155,3 +159,41 @@ def create_user_handler(
             "email": new_user["email"],
         },
     }
+
+
+# =========================================================
+# 전체 회원 조회 API (안주형 작업)
+# =========================================================
+
+@router.get("/users")
+async def get_users():
+    return [
+        {
+            "id": user["id"],
+            "name": user["name"],
+            "age": user["age"],
+            "email": user["email"]
+        }
+        for user in user_list
+    ]
+
+
+# =========================================================
+# 특정 회원 조회 API (안주형 작업)
+# =========================================================
+
+@router.get("/users/{user_id}")
+async def get_user(user_id: int):
+    for user in user_list:
+        if user["id"] == user_id:
+            return {
+                "id": user["id"],
+                "name": user["name"],
+                "age": user["age"],
+                "email": user["email"]
+            }
+
+    raise HTTPException(
+        status_code=404,
+        detail="해당 회원을 찾을 수 없습니다."
+    )
