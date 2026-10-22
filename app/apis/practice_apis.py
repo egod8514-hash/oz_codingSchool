@@ -28,7 +28,7 @@ user_list = [
     }
 ]
 
-# 회원 정보 삭제 API 부분 (신혜원 작업)
+# 회원 삭제 API 부분 (신혜원 작업)
 
 @router.delete(
     "/users/{user_id}",
@@ -41,7 +41,7 @@ async def delete_user_handler(user_id: int):
     for idx, user in enumerate(user_list):
         if user["id"] == user_id:
             user_list.pop(idx)
-            return {"message": f"성공적으로 ID {user_id}번 회원의 모든 정보를 삭제했습니다."}
+            return {"message": f"ID {user_id}번 회원의 정보를 삭제했습니다."}
 
    
     raise HTTPException(
