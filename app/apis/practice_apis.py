@@ -164,44 +164,6 @@ def create_user_handler(
 
 
 # =========================================================
-# 전체 회원 조회 API (안주형 작업)
-# =========================================================
-
-@router.get("/users")
-async def get_users():
-    return [
-        {
-            "id": user["id"],
-            "name": user["name"],
-            "age": user["age"],
-            "email": user["email"]
-        }
-        for user in user_list
-    ]
-
-
-# =========================================================
-# 특정 회원 조회 API (안주형 작업)
-# =========================================================
-
-@router.get("/users/{user_id}")
-async def get_user(user_id: int):
-    for user in user_list:
-        if user["id"] == user_id:
-            return {
-                "id": user["id"],
-                "name": user["name"],
-                "age": user["age"],
-                "email": user["email"]
-            }
-
-    raise HTTPException(
-        status_code=404,
-        detail="해당 회원을 찾을 수 없습니다."
-    )
-
-
-# =========================================================
 # 회원 정보 삭제 API (신혜원 작업)
 # =========================================================
 
@@ -233,3 +195,10 @@ async def delete_user_handler(user_id: int):
 from app.apis import update_user
 
 router.include_router(update_user.router)
+
+# =========================================================
+# GET 회원 조회 API 연결(안주형 작업)
+# =========================================================
+from app.apis import get_user
+
+router.include_router(get_user.create_router(user_list))
