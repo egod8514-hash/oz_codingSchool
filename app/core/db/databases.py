@@ -19,3 +19,14 @@ Base = declarative_base()
 async def async_get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as db:
         yield db
+
+
+# 구민준 작성
+
+SessionFactory = sessionmaker(
+    bind=engine,
+    # 자동 동작 방지용
+    autoflush=False,
+    autocommit=False,
+    expire_on_commit=False,
+)
