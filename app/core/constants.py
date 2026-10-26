@@ -15,3 +15,11 @@ PASSWORD_MAX_LEN = 20
 
 PARAM_NAME_STATUS_CODE = "status_code"
 PARAM_NAME_DETAIL = "detail"
+
+TABLE_NAME_USERS = "users"
+TABLE_NAME_XRAY = "xray_images"
+TABLE_NAME_MEDICAL = "medical_records"
+TABLE_NAME_AI_RESULTS = "ai_analysis_results"
+TABLE_NAME_PATIENTS = "patients"
+
+RELATION_CASCADE = "all, delete-orphan"
