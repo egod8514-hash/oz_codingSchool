@@ -16,7 +16,8 @@ from app.schemas.users import (
 )
 from app.core import (
     constants,
-    security
+    security,
+    message
 )
 from app.core.db.databases import async_get_db
 from app.core.dependencies import get_current_user
@@ -55,7 +56,7 @@ async def update_info(
     await db.refresh(current_user)
 
     return {
-        "message" : "5"
+        "message" : message.INFO_MESSAGE_USER_INFO_UPDATE
     }
 
 # @router.patch("/password",
@@ -72,7 +73,7 @@ async def update_info(
 #     if not security.verify_password(body.password, current_user.hashed_password) : 
 #         raise HTTPException(
 #             status_code = status.HTTP_400_BAD_REQUEST,
-#             detail = "3",
+#             detail = message.ERROR_MESSAGE_CURRENT_PASSWORD,
 #         )
 
 #     # 새 비밀번호의 해시 코드를 생성
@@ -83,7 +84,7 @@ async def update_info(
 #     await db.refresh(current_user)
 
 #     return {
-#         "message" : "4"
+#         "message" : message.INFO_MESSAGE_PASSWORD_UPDATE
 #     }
 
 # @router.delete("/",
@@ -98,5 +99,5 @@ async def update_info(
 #     db.commit()
 
 #     return {
-#         "message" : "6"
+#         "message" : message.INFO_MESSAGE_ACCOUNT_DELETE
 #     }

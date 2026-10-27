@@ -11,7 +11,10 @@ from fastapi import (
 )
 
 from app.core.enum.enum_department import DepartmentEnum
-from app.core import constants
+from app.core import (
+    constants,
+    message
+)
 
 class MyPageResponse(BaseModel) : 
     name : str
@@ -54,13 +57,13 @@ class MyPageUpdatePasswordRequest(BaseModel) :
         if self.new_password != self.new_password_confirm : 
             raise HTTPException(
                 status_code = status.HTTP_400_BAD_REQUEST,
-                detail = "1",
+                detail = message.ERROR_MESSAGE_NEW_PASSWORD,
             )
 
         if self.password == self.new_password : 
             raise HTTPException(
                 status_code = status.HTTP_400_BAD_REQUEST,
-                detail = "2",
+                detail = message.ERROR_MESSAGE_CURRENT_PASSWORD,
             )
 
         return self

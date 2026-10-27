@@ -23,6 +23,20 @@ MESSAGE_E0008 = "이메일 형식에 맞게 입력해주세요."
 MESSAGE_E0009 = "유효하지 않습니다."
 MESSAGE_E0010 = "수정할 데이터(age, email, password)를 전부 입력해주세요."
 
+ERROR_MESSAGE_DEPARTMENT = "유효한 부서를 입력해주세요."
+ERROR_MESSAGE_EMAIL = "유효한 이메일 형식에 맞게 30자 이하로 입력해주세요."
+ERROR_MESSAGE_NEW_PASSWORD = "새로운 패스워드와 확인용 패스워드를 똑같이 입력해주세요. "
+ERROR_MESSAGE_CURRENT_PASSWORD = "현재 패스워드와 일치하지 않습니다."
+ERROR_MESSAGE_NONE_USER_INFO = "ID {x_user_id}번에 해당하는 계정을 찾을 수 없습니다."
+ERROR_MESSAGE_NONE_PATIENT_INFO = "{x_patient_id}번에 해당하는 환자를 찾을 수 없습니다."
+ERROR_MESSAGE_DELETE_USER = "탈퇴 처리된 계정입니다."
+ERROR_MESSAGE_REQUIRED_ADMIN_ROLE = "관리자(어드민) 권한이 필요합니다."
+ERROR_MESSAGE_PENDING_ROLE = "권한이 없습니다."
+INFO_MESSAGE_USER_INFO_UPDATE = "회원 정보를 수정했습니다."
+INFO_MESSAGE_PATIENT_INFO_UPDATE = "환자 정보를 수정했습니다."
+INFO_MESSAGE_PASSWORD_UPDATE = "비밀번호를 수정했습니다."
+INFO_MESSAGE_ACCOUNT_DELETE = "탈퇴가 정상 처리됐습니다."
+
 MESSAGE_ID_RANGE = COMMON_MESSAGE2.format(
     item = MESSAGE_ITEM_NAME_ID,
     message = MESSAGE_E0009
