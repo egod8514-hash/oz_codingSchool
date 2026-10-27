@@ -7,9 +7,10 @@ COL_NAME_EMAIL = "email"
 COL_NAME_PASSWORD = "password"
 
 MIN_AGE = 14
+PHONE_NUMBER_REGEX = re.compile(r"^(01[0-9]|02|0[3-9][0-9])-([0-9]{3,4})-([0-9]{4})$")
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]\.[a-zA-Z]{2,}$")
 EMAIL_MAX_LEN = 30
-PASSWORD_REGEX = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$")
+PASSWORD_REGEX = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$")
 PASSWORD_MIN_LEN = 8
 PASSWORD_MAX_LEN = 20
 
