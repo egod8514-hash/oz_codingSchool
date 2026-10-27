@@ -2,14 +2,33 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
 from app.apis.practice_apis import router as practice_router
+from app.apis.admin import router as admin_router
+from app.apis.auth import router as auth_router
 
-app = FastAPI()
+app = FastAPI(
+    title="AI Health Management API",
+    description="사내 흉부 X-Ray AI 진단 서비스 API",
+    version="0.1.0",
+)
 
+# CORS 설정
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 라우터 등록
 app.include_router(practice_router)
+app.include_router(admin_router)
+app.include_router(auth_router)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
