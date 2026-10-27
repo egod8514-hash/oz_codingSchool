@@ -7,6 +7,7 @@ from starlette.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
 from app.apis.practice_apis import router as practice_router
+from app.apis.admin import router as admin_router
 from app.apis.auth import router as auth_router
 
 app = FastAPI(
@@ -26,6 +27,7 @@ app.add_middleware(
 
 # 라우터 등록
 app.include_router(practice_router)
+app.include_router(admin_router)
 app.include_router(auth_router)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
