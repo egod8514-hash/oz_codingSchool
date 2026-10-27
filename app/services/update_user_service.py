@@ -1,4 +1,4 @@
-from app.schemas import User
+from app.schemas.user import User
 
 from app.core import (
     constants,
