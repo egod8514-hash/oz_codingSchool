@@ -1,18 +1,26 @@
-from passlib.context import CryptContext
+import bcrypt
 
-pwd_context = CryptContext(schemes = ["bcrypt"], deprecated = "auto")
 
-# 비밀번호 확인
+def hash_password(password: str) -> str:
+    """비밀번호를 bcrypt 방식으로 해싱합니다."""
+    salt = bcrypt.gensalt()
+    hashed_password = bcrypt.hashpw(
+        password.encode("utf-8"),
+        salt
+    )
+
+    return hashed_password.decode("utf-8")
+
+
 def verify_password(
-            plain_password : str,
-            hashed_password : str
-    ) -> bool : 
-
-    return pwd_context.verify(plain_password, hashed_password)
-
-# 패스워드 변경 시 해시코드로 변경
-def get_password_hash(
-            password : str
-    ) -> str : 
-
-    return pwd_context.hash(password)
+    plain_password: str,
+    hashed_password: str
+) -> bool:
+    """입력한 비밀번호와 해싱된 비밀번호를 비교합니다."""
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8"),
+            hashed_password.encode("utf-8")
+        )
+    except Exception:
+        return False
