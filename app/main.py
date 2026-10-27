@@ -1,5 +1,9 @@
 import os
 from pathlib import Path
+from app.apis.patient_medical_records import (
+    router as patient_medical_record_router,
+)
+
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,6 +33,8 @@ app.add_middleware(
 app.include_router(practice_router)
 app.include_router(admin_router)
 app.include_router(auth_router)
+app.include_router(patient_medical_record_router)
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
