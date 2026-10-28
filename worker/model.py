@@ -93,8 +93,3 @@ class PneumoniaPredictor:
 
 # 서버 시작 시 미리 모델을 메모리에 상주 (싱글톤)
 predictor = PneumoniaPredictor()
-
-
-
-# 서버 시작 시 미리 모델을 메모리에 상주 (싱글톤)
-predictor = PneumoniaPredictor()
