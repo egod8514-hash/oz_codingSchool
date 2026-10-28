@@ -1,4 +1,4 @@
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -13,11 +13,6 @@ from app.schemas.auth import SignupRequest, SignupResponse, LoginRequest, LoginR
 async def register_user(db: AsyncSession, data: SignupRequest) -> SignupResponse:
     """
     REQ-USER-001: 신규 사용자 회원가입
-    1. 이메일 중복 체크 (409 Conflict)
-    2. 전화번호 중복 체크 (409 Conflict)
-    3. 비밀번호 bcrypt 해싱
-    4. UserModel 생성 (기본 권한: PENDING, 활성 상태: True)
-    5. DB 커밋 및 신규 유저 ID 반환
     """
     # 1. 이메일 중복 체크
     stmt_email = select(UserModel).where(UserModel.email == data.email)
@@ -29,7 +24,8 @@ async def register_user(db: AsyncSession, data: SignupRequest) -> SignupResponse
         )
 
     # 2. 전화번호 중복 체크
-    stmt_phone = select(UserModel).where(UserModel.phone_number == data.phone)
+    phone_val = data.phone or data.phone_number
+    stmt_phone = select(UserModel).where(UserModel.phone_number == phone_val)
     existing_user_phone = (await db.execute(stmt_phone)).scalar_one_or_none()
     if existing_user_phone:
         raise HTTPException(
@@ -45,7 +41,7 @@ async def register_user(db: AsyncSession, data: SignupRequest) -> SignupResponse
         email=data.email,
         hashed_password=hashed_pwd,
         name=data.name,
-        phone_number=data.phone,
+        phone_number=phone_val,
         department=DepartmentEnum(data.department),
         gender=GenderEnum(data.gender),
         role=RoleEnum.PENDING,
@@ -66,22 +62,16 @@ async def register_user(db: AsyncSession, data: SignupRequest) -> SignupResponse
 async def authenticate_user(db: AsyncSession, data: LoginRequest) -> LoginResponse:
     """
     REQ-USER-002: 로그인 기본 로직
-    1. 이메일로 사용자 조회
-    2. 사용자 미존재 또는 탈퇴 계정(is_deleted) 검증
-    3. bcrypt 비밀번호 일치 검증
-    4. 일치 시 로그인 성공 및 사용자 정보 반환
     """
     stmt = select(UserModel).where(UserModel.email == data.email)
     user = (await db.execute(stmt)).scalar_one_or_none()
 
-    # 계정이 없거나 탈퇴한 회원인 경우 (보안을 위해 동일한 401 메시지 반환)
     if not user or user.is_deleted:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="이메일 또는 비밀번호가 일치하지 않습니다."
         )
 
-    # 비밀번호 검증
     if not verify_password(data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -90,6 +80,8 @@ async def authenticate_user(db: AsyncSession, data: LoginRequest) -> LoginRespon
 
     return LoginResponse(
         message="로그인에 성공했습니다.",
+        access_token=str(user.id),
+        token_type="bearer",
         user=UserInfo(
             id=user.id,
             email=user.email,
@@ -97,7 +89,29 @@ async def authenticate_user(db: AsyncSession, data: LoginRequest) -> LoginRespon
             department=user.department.value if hasattr(user.department, "value") else str(user.department),
             gender=user.gender.value if hasattr(user.gender, "value") else str(user.gender),
             phone_number=user.phone_number,
-            role=user.role.value if hasattr(user.role, "value") else str(user.role),
+            role=(user.role.value if hasattr(user.role, "value") else str(user.role)).lower(),
             is_active=user.is_active,
         )
     )
+
+
+async def login_request_handler(request: Request, db: AsyncSession) -> LoginResponse:
+    """
+    JSON 및 FormData(application/x-www-form-urlencoded 등)를 모두 수용하는 로그인 헬퍼
+    """
+    content_type = request.headers.get("content-type", "")
+    if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+        form = await request.form()
+        email = form.get("username") or form.get("email")
+        password = form.get("password")
+        if not email or not password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="이메일과 비밀번호를 모두 입력해주세요."
+            )
+        data = LoginRequest(email=str(email), password=str(password))
+    else:
+        body = await request.json()
+        data = LoginRequest(**body)
+
+    return await authenticate_user(db, data)

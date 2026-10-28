@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 import re
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.core.enum.enum_gender import GenderEnum
 
@@ -29,7 +29,6 @@ class PatientCreateRequest(BaseModel):
     @classmethod
     def resolve_phone(cls, values: dict):
         if isinstance(values, dict):
-            # phone과 phone_number 중 하나라도 들어오면 매핑
             p = values.get("phone") or values.get("phone_number")
             if not p:
                 raise ValueError("연락처(phone 또는 phone_number)는 필수 입력 항목입니다.")
@@ -50,11 +49,28 @@ class PatientCreateRequest(BaseModel):
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v: str) -> str:
-        # 숫자만 추출하거나 하이픈 포함 형식 검증
         digits = re.sub(r"[^\d]", "", v)
         if len(digits) < 9 or len(digits) > 12:
             raise ValueError("올바른 전화번호 형식이 아닙니다.")
         return v
+
+
+class PatientUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=30, description="수정할 환자 이름")
+    age: Optional[int] = Field(None, ge=0, le=150, description="수정할 환자 나이")
+    gender: Optional[str] = Field(None, description="수정할 성별")
+    phone: Optional[str] = Field(None, description="수정할 전화번호")
+    phone_number: Optional[str] = Field(None, description="수정할 전화번호 (별칭)")
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_phone(cls, values: dict):
+        if isinstance(values, dict):
+            p = values.get("phone_number") or values.get("phone")
+            if p:
+                values["phone"] = str(p).strip()
+                values["phone_number"] = str(p).strip()
+        return values
 
 
 class PatientResponse(BaseModel):
@@ -67,14 +83,12 @@ class PatientResponse(BaseModel):
     created_at: datetime = Field(..., description="등록 일시")
     updated_at: Optional[datetime] = Field(None, description="수정 일시")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
     @model_validator(mode="before")
     @classmethod
     def set_phone_number(cls, data):
         if hasattr(data, "phone") and not hasattr(data, "phone_number"):
-            # ORM 객체인 경우
             gender_val = data.gender.value if hasattr(data.gender, "value") else str(data.gender)
             return {
                 "id": data.id,
@@ -87,3 +101,8 @@ class PatientResponse(BaseModel):
                 "updated_at": data.updated_at,
             }
         return data
+
+
+# 기존 호환성용 alias
+PatientInfoPageResponse = PatientResponse
+PatientInfoUpdateRequest = PatientUpdateRequest

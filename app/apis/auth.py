@@ -1,11 +1,10 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db.databases import async_get_db
 from app.schemas.auth import (
     SignupRequest,
     SignupResponse,
-    LoginRequest,
     LoginResponse,
 )
 from app.services import auth_service
@@ -30,12 +29,12 @@ async def signup(
 @router.post(
     "/login",
     summary="[REQ-USER-002] 로그인",
-    description="이메일과 비밀번호를 검증하여 DB 일치 여부를 확인하고 사용자 기본 정보를 반환합니다.",
+    description="이메일과 비밀번호를 검증하여 DB 일치 여부를 확인하고 사용자 기본 정보를 반환합니다. (JSON 및 Form-Data 모두 지원)",
     status_code=status.HTTP_200_OK,
     response_model=LoginResponse,
 )
 async def login(
-    data: LoginRequest,
+    request: Request,
     db: AsyncSession = Depends(async_get_db),
 ):
-    return await auth_service.authenticate_user(db, data)
+    return await auth_service.login_request_handler(request, db)

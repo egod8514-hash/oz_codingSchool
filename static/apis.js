@@ -228,7 +228,11 @@ const apis = {
      */
     async getPatients(params = {}) {
         const query = new URLSearchParams(params).toString();
-        return await this.request(`/patients${query ? `?${query}` : ''}`);
+        const res = await this.request(`/patients${query ? `?${query}` : ''}`);
+        if (Array.isArray(res)) return res;
+        if (res && Array.isArray(res.patients)) return res.patients;
+        if (res && Array.isArray(res.items)) return res.items;
+        return [];
     },
 
     /**
@@ -277,7 +281,10 @@ const apis = {
      * [REQ-MDR-002] 특정 환자의 진료 기록 목록을 조회할 수 있다.
      */
     async getPatientMedicalRecords(patientId) {
-        return await this.request(`/patients/${patientId}/medical-records`);
+        const res = await this.request(`/patients/${patientId}/medical-records`);
+        if (Array.isArray(res)) return res;
+        if (res && Array.isArray(res.medical_records)) return res.medical_records;
+        return [];
     },
 
     /**
@@ -303,7 +310,10 @@ const apis = {
      * [REQ-PRED-002] 특정 진료기록에 대해 수행된 모든 AI 예측 결과 목록을 조회한다.
      */
     async getMedicalRecordAnalyses(recordId) {
-        return await this.request(`/medical-records/${recordId}/analyses`);
+        const res = await this.request(`/medical-records/${recordId}/analyses`);
+        if (Array.isArray(res)) return res;
+        if (res && Array.isArray(res.analyses)) return res.analyses;
+        return [];
     },
 
     // --- Admin ---
@@ -314,7 +324,10 @@ const apis = {
      */
     async adminGetUsers(params = {}) {
         const query = new URLSearchParams(params).toString();
-        return await this.request(`/admin/users${query ? `?${query}` : ''}`);
+        const res = await this.request(`/admin/users${query ? `?${query}` : ''}`);
+        if (Array.isArray(res)) return res;
+        if (res && Array.isArray(res.users)) return res.users;
+        return [];
     },
 
     /**

@@ -1,4 +1,5 @@
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.patients import PatientModel
@@ -21,10 +22,15 @@ async def get_medical_records_by_patient(
     if patient is None:
         return None
 
-    # 해당 환자의 진료기록 목록 조회
-    record_query = select(MedicalRecordModel).where(
-        MedicalRecordModel.patient_id == patient_id,
-        MedicalRecordModel.is_deleted.is_(False),
+    # 해당 환자의 진료기록 목록 조회 (xray_images 관계 eager loading)
+    record_query = (
+        select(MedicalRecordModel)
+        .options(selectinload(MedicalRecordModel.xray_images))
+        .where(
+            MedicalRecordModel.patient_id == patient_id,
+            MedicalRecordModel.is_deleted.is_(False),
+        )
+        .order_by(MedicalRecordModel.id.desc())
     )
 
     record_result = await db.execute(record_query)
@@ -36,9 +42,13 @@ async def get_medical_record(
     db: AsyncSession,
     record_id: int,
 ):
-    query = select(MedicalRecordModel).where(
-        MedicalRecordModel.id == record_id,
-        MedicalRecordModel.is_deleted.is_(False),
+    query = (
+        select(MedicalRecordModel)
+        .options(selectinload(MedicalRecordModel.xray_images))
+        .where(
+            MedicalRecordModel.id == record_id,
+            MedicalRecordModel.is_deleted.is_(False),
+        )
     )
 
     result = await db.execute(query)
