@@ -1,96 +1,180 @@
-# 5일차 환자관리 API 설계 문서
+# 5일차 환자 관리 및 진료기록 API 설계
 
-본 문서는 환자 정보 삭제 및 연관된 진료기록(X-Ray 이미지 포함) 등록을 처리하는 API 명세서입니다.
+## 1. API 역할 분담
+
+| 담당 | 요구사항 | 기능 | Method | Endpoint |
+|---|---|---|---|---|
+| 팀원 1 | REQ-PTNT-001 | 환자 정보 등록 | POST | `/api/v1/patients` |
+| 팀원 1 | REQ-PTNT-002 | 환자 목록 조회 | GET | `/api/v1/patients` |
+| 팀원 2 | REQ-PTNT-003 | 환자 상세 조회 | GET | `/api/v1/patients/{patient_id}` |
+| 팀원 2 | REQ-PTNT-004 | 환자 정보 수정 | PATCH | `/api/v1/patients/{patient_id}` |
+| 팀원 3 | REQ-PTNT-005 | 환자 정보 삭제 | DELETE | `/api/v1/patients/{patient_id}` |
+| 팀원 3 | REQ-MDR-001 | 진료기록 등록 | POST | `/api/v1/patients/{patient_id}/medical-records` |
+| **팀원 4** | **REQ-MDR-002** | **진료기록 목록 조회** | **GET** | `/api/v1/patients/{patient_id}/medical-records` |
+| **팀원 4** | **REQ-MDR-003** | **진료기록 상세 조회** | **GET** | `/api/v1/medical-records/{record_id}` |
 
 ---
 
-## 1. 환자 정보 삭제 API
+# 2. 브랜치
 
-### 기본 정보
-- **Method / Path:** `DELETE /practice_api/patients/{patient_id}`
-- **설명:** 시스템에서 특정 환자의 정보를 삭제합니다. 삭제 시 해당 환자와 연계된 모든 진료기록 및 업로드된 X-Ray 이미지 파일이 함께 연쇄 삭제(Cascade Delete)됩니다.
-- **권한:** 의료인 (의사/간호사 역할군만 접근 가능)
-
-### Path Parameters
-
-| 파라미터명 | 타입 | 필수 여부 | 설명 |
-| :--- | :--- | :--- | :--- |
-| `patient_id` | Integer | 필수 | 삭제할 환자의 고유 식별 번호 |
-
-### Response
-#### 🟢 200 OK (성공)
-```json
-{
-  "status": "success",
-  "message": "환자 정보 및 연관 데이터가 성공적으로 삭제되었습니다.",
-  "data": {
-    "patient_id": 123
-  }
-}
-```
-
-#### 🔴 404 Not Found (실패: 대상 없음)
-```json
-{
-  "status": "error",
-  "code": "PATIENT_NOT_FOUND",
-  "message": "해당 ID를 가진 환자를 찾을 수 없습니다."
-}
+```text
+팀원 1 : feature/patient-create-list
+팀원 2 : feature/patient-detail-update
+팀원 3 : feature/patient-delete-record-create
+팀원 4 : feature/medical-record-read
 ```
 
 ---
 
-## 2. 환자 진료기록 및 X-Ray 등록 API
+# 3. 팀원 4 담당 기능
 
-### 기본 정보
-- **Method / Path:** `POST /practice_api/patients/{patient_id}/medical-records`
-- **Content-Type:** `multipart/form-data`
-- **설명:** 특정 환자의 새로운 진료기록 텍스트 데이터와 X-Ray 이미지 파일을 함께 업로드하여 저장합니다. 데이터베이스 저장에 실패할 경우 파일 업로드도 함께 롤백됩니다.
+## REQ-MDR-002 진료기록 목록 조회
 
-### Path Parameters
+특정 환자의 진료기록 전체 목록을 조회한다.
 
-| 파라미터명 | 타입 | 필수 여부 | 설명 |
-| :--- | :--- | :--- | :--- |
-| `patient_id` | Integer | 필수 | 진료기록을 등록할 환자의 고유 식별 번호 |
+### Method / Endpoint
 
-### Request Body (Multipart/Form-Data)
+```text
+GET /api/v1/patients/{patient_id}/medical-records
+```
 
-| 필드명 | 타입 | 필수 여부 | 설명 |
-| :--- | :--- | :--- | :--- |
-| `chart_number` | String | 필수 | 고유 차트 번호 (중복 불가) |
-| `diagnosis` | String | 필수 | 의사 진단 소견 및 메모 |
-| `treatment_plan`| String | 선택 | 향후 치료 계획 |
-| `xray_image` | File | 필수 | X-Ray 이미지 파일 (지원 포맷: JPG, PNG) |
+### Path Parameter
 
-### Response
-#### 🟢 201 Created (성공)
+- `patient_id` : 환자 고유 ID
+
+### Response 예시
+
 ```json
 {
-  "status": "success",
-  "message": "진료기록 및 X-Ray 이미지가 성공적으로 등록되었습니다.",
-  "data": {
-    "record_id": 456,
-    "patient_id": 123,
-    "chart_number": "CHART-2026-001",
-    "xray_url": "/static/uploads/xray/20261027_123.png"
-  }
+  "medical_records": [
+    {
+      "id": 1,
+      "patient_id": 1,
+      "chart_number": "CHART-0001",
+      "symptoms": "기침 및 흉통"
+    },
+    {
+      "id": 2,
+      "patient_id": 1,
+      "chart_number": "CHART-0002",
+      "symptoms": "호흡곤란"
+    }
+  ]
 }
 ```
 
-#### 🔴 404 Not Found (실패: 환자 없음)
+### 처리
+
+- 환자가 존재하는지 확인
+- 해당 환자의 진료기록 조회
+- 진료기록이 여러 개면 목록으로 반환
+- 환자가 존재하지 않으면 `404 Not Found`
+
+---
+
+## REQ-MDR-003 진료기록 상세 조회
+
+진료기록 ID를 이용하여 특정 진료기록의 상세 정보를 조회한다.
+
+### Method / Endpoint
+
+```text
+GET /api/v1/medical-records/{record_id}
+```
+
+### Path Parameter
+
+- `record_id` : 진료기록 고유 ID
+
+### Response 예시
+
 ```json
 {
-  "status": "error",
-  "code": "PATIENT_NOT_FOUND",
-  "message": "진료기록을 등록하려는 환자가 존재하지 않습니다."
+  "id": 1,
+  "patient_id": 1,
+  "chart_number": "CHART-0001",
+  "symptoms": "기침 및 흉통"
 }
 ```
 
-#### 🔴 409 Conflict (실패: 차트 번호 중복)
-```json
-{
-  "status": "error",
-  "code": "DUPLICATE_CHART_NUMBER",
-  "message": "이미 존재하는 차트 번호입니다. 다른 번호를 입력해 주세요."
-}
+### 처리
+
+- `record_id`로 진료기록 조회
+- 존재하면 상세 정보 반환
+- 존재하지 않으면 `404 Not Found`
+
+---
+
+# 4. 공통 파일 구조
+
+```text
+app/
+├── apis/
+│   ├── patients.py
+│   └── medical_records.py
+│
+├── schemas/
+│   ├── patient.py
+│   └── medical_record.py
+│
+└── services/
+    ├── patient_service.py
+    └── medical_record_service.py
 ```
+
+팀원 4은 주로 다음 파일을 사용한다.
+
+```text
+app/apis/medical_records.py
+app/schemas/medical_record.py
+app/services/medical_record_service.py
+```
+
+기존 MedicalRecord 관련 Model이 존재하면 해당 Model을 사용한다.
+
+---
+
+# 5. 작업 순서
+
+```text
+최신 main pull
+    ↓
+feature/medical-record-read 브랜치 생성
+    ↓
+기존 MedicalRecord Model 확인
+    ↓
+Schema 작성
+    ↓
+Service 작성
+    ↓
+API 작성
+    ↓
+Swagger 테스트
+    ↓
+Commit / Push
+    ↓
+Pull Request
+```
+
+## Swagger 테스트
+
+### 진료기록 목록
+
+```text
+GET /api/v1/patients/1/medical-records
+```
+
+확인:
+- 정상 목록 조회
+- 진료기록이 없는 경우
+- 존재하지 않는 환자
+
+### 진료기록 상세
+
+```text
+GET /api/v1/medical-records/1
+```
+
+확인:
+- 정상 상세 조회
+- 존재하지 않는 진료기록

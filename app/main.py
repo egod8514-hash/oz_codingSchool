@@ -13,6 +13,7 @@ from starlette.responses import FileResponse
 from app.apis.practice_apis import router as practice_router
 from app.apis.admin import router as admin_router
 from app.apis.auth import router as auth_router
+from app.apis.medical_records import router as medical_records_router
 
 app = FastAPI(
     title="AI Health Management API",
@@ -34,7 +35,7 @@ app.include_router(practice_router)
 app.include_router(admin_router)
 app.include_router(auth_router)
 app.include_router(patient_medical_record_router)
-
+app.include_router(medical_records_router)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 

@@ -34,6 +34,10 @@ class XrayImageResponse(BaseModel):
 class MedicalRecordResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+from pydantic import BaseModel, ConfigDict
+
+
+class MedicalRecordResponse(BaseModel):
     id: int
     patient_id: int
     chart_number: str
@@ -44,3 +48,9 @@ class MedicalRecordResponse(BaseModel):
 
 class DeletePatientResponse(BaseModel):
     message: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MedicalRecordListResponse(BaseModel):
+    medical_records: list[MedicalRecordResponse]
