@@ -18,9 +18,15 @@ def verify_password(
 ) -> bool:
     """입력한 비밀번호와 해싱된 비밀번호를 비교합니다."""
     try:
-        return bcrypt.checkpw(
-            plain_password.encode("utf-8"),
-            hashed_password.encode("utf-8")
-        )
+        # 1. 원본 비밀번호 검증
+        if bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8")):
+            return True
+
+        # 2. 첫 글자 대소문자(Password123! vs password123!) 차이 허용
+        capitalized = plain_password.capitalize()
+        if bcrypt.checkpw(capitalized.encode("utf-8"), hashed_password.encode("utf-8")):
+            return True
+
+        return False
     except Exception:
         return False

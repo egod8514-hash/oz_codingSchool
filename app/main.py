@@ -1,9 +1,5 @@
 import os
 from pathlib import Path
-from app.apis.patient_medical_records import (
-    router as patient_medical_record_router,
-)
-
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +9,7 @@ from starlette.responses import FileResponse
 from app.apis.practice_apis import router as practice_router
 from app.apis.admin import router as admin_router
 from app.apis.auth import router as auth_router
+from app.apis.users import router as users_router
 from app.apis.patients import router as patient_router
 from app.apis.medical_records import router as medical_records_router
 
@@ -32,12 +29,12 @@ app.add_middleware(
 )
 
 # 라우터 등록
-app.include_router(practice_router)
-app.include_router(admin_router)
 app.include_router(auth_router)
+app.include_router(users_router)
+app.include_router(admin_router)
 app.include_router(patient_router)
-app.include_router(patient_medical_record_router)
 app.include_router(medical_records_router)
+app.include_router(practice_router)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -68,6 +65,7 @@ async def catch_all(path: str):
     # API나 정적 파일 경로는 제외 (FastAPI가 먼저 매칭하지 못한 경우에만 실행됨)
     if (
         path.startswith("api/v1")
+        or path.startswith("practice_api")
         or path.startswith("static/")
         or path.startswith("media/")
     ):
