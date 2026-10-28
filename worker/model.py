@@ -35,6 +35,7 @@ class PneumoniaPredictor:
         """
         worker/models 디렉토리 내의 model.pth 또는 model_state_dict.pth를 메모리에 로드합니다.
         """
+        
         # 케이스 1: 모델 구조 전체가 저장된 model.pth 로드 시도
         if os.path.exists(MODEL_PTH_PATH):
             try:
