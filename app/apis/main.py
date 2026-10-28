@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # 작성 중인 practice_apis의 router 불러오기
 from app.apis.practice_apis import router as practice_router
 from app.apis.users import router as users_router
+from app.apis.patient import router as patient_router
 
 app = FastAPI(
     title="Hospital User Management API",
@@ -23,6 +24,8 @@ app.add_middleware(
 # 작성된 라우터 등록
 app.include_router(practice_router)
 app.include_router(users_router, prefix = "/api/v1/users")
+app.include_router(patient_router)
+
 
 @app.get("/")
 async def root():
