@@ -5,14 +5,14 @@ import torch.nn as nn
 from torchvision import transforms, models
 from PIL import Image
 
-# 1. 모델 파일 경로 설정
+# 1. 모델 파일 경로 설정 (worker/models 디렉터리 내 파일)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PTH_PATH = os.path.join(BASE_DIR, "models", "model.pth")
 MODEL_STATE_DICT_PATH = os.path.join(BASE_DIR, "models", "model_state_dict.pth")
 
 MODEL_NAME = "PneumoniaModel-v1"
 
-# 2. X-ray 이미지 전처리 (224x224 리사이즈, RGB 변환 및 정규화)
+# 2. X-ray 이미지 전처리 (224x224 리사이즈, 3채널 RGB 변환 및 정규화)
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.Grayscale(num_output_channels=3),  # 3채널 RGB 변환
@@ -29,13 +29,13 @@ class PneumoniaPredictor:
         self.model.eval()  # 추론 모드 설정
 
         # NFR-PRED-001 (Recall ≥ 0.90) 달성을 위한 임계값 조정
+        # 폐렴 환자를 정상으로 오진(FN)하는 위험을 방지하기 위해 threshold 설정
         self.decision_threshold = 0.35
 
     def _load_model(self) -> torch.nn.Module:
         """
         worker/models 디렉토리 내의 model.pth 또는 model_state_dict.pth를 메모리에 로드합니다.
         """
-        
         # 케이스 1: 모델 구조 전체가 저장된 model.pth 로드 시도
         if os.path.exists(MODEL_PTH_PATH):
             try:
@@ -58,7 +58,7 @@ class PneumoniaPredictor:
             print(f"[Worker] model_state_dict.pth 로드 성공: {MODEL_STATE_DICT_PATH}")
             return model
 
-        # 기본 인스턴스 예비 생성
+        # 모델 파일이 비어있거나 찾을 수 없는 경우 예비 인스턴스 생성
         print("[Worker] ⚠️ 모델 파일을 찾을 수 없어 기본 ResNet18 인스턴스를 생성합니다.")
         model = models.resnet18(weights=None)
         model.fc = nn.Linear(model.fc.in_features, 2)
@@ -76,6 +76,7 @@ class PneumoniaPredictor:
             outputs = self.model(input_tensor)
             probabilities = torch.softmax(outputs, dim=1)
 
+            # 폐렴(1번 클래스) 확률 추출 (배치 [0], 클래스 [1])
             pneumonia_prob = round(probabilities[0][1].item(), 4)
 
             # Recall 중심 판정 (임계값 0.35 이상 시 폐렴 진단)
@@ -88,6 +89,11 @@ class PneumoniaPredictor:
             "pneumonia_probability": pneumonia_prob,
             "model_name": self.model_name
         }
+
+
+# 서버 시작 시 미리 모델을 메모리에 상주 (싱글톤)
+predictor = PneumoniaPredictor()
+
 
 
 # 서버 시작 시 미리 모델을 메모리에 상주 (싱글톤)
