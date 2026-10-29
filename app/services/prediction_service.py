@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy import select, insert
@@ -14,13 +15,14 @@ from app.schemas.predictions import (
     PatientXrayAnalysisItem,
     PatientXrayAnalysisListResponse,
 )
+from worker.model import predictor
 
 async def save_prediction_pre_check(
     db : AsyncSession,
     record_id : int,
     current_user : UserModel,
     ai_model : str,
-) : 
+) -> AnalysisResultModel : 
     # 권한 검증 : 승인 대기자 접근 차단
     if current_user.role == RoleEnum.PENDING : 
         raise HTTPException(
@@ -51,9 +53,11 @@ async def save_prediction_pre_check(
     prediction_result = await db.execute(prediction_stmt)
     prediction = prediction_result.scalar_one_or_none()
 
-    # 조기 종료를 위한 ai예측 데이터 반환
-    yield prediction
+    return prediction
 
+async def prediction(
+    record_id : int
+) -> dict : 
     # X-ray 이미지 확인
     xray_stmt = select(XrayImagesModel).where(
         XrayImagesModel.record_id == record_id,
@@ -68,22 +72,46 @@ async def save_prediction_pre_check(
             detail = "X-ray 레코드를 찾을 수 없습니다."
         )
 
-    yield xray
+    # X-ray 경로 확인
+    image_path = Path(xray.image_url)
+
+    if not image_path.exists() : 
+        raise HTTPException(
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail = "X-ray 이미지 파일을 찾을 수 없습니다."
+        )
+
+    # X-ray 이미지 불러오기
+    try : 
+        image_bytes = image_path.read_bytes()
+    except OSError : 
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = "X-ray 이미지를 읽을 수 없습니다."
+        )
+
+    # AI모델 예측
+    try : 
+        return predictor.predict(image_bytes)
+    except Exception as e : 
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = f"폐렴 AI 예측 중 오류가 발생했습니다. : ¥n{str(e)}"
+        )
+
 
 async def save_prediction_post(
     db : AsyncSession,
     record_id : int,
-    # TODO : ai예측 모델
-    prediction_model : None,
+    prediction : dict,
 ) : 
     # DB 저장
     insert_stmt = insert(AnalysisResultModel).values(
         record_id = record_id,
-        # TODO : ai모델 예측 정보
-        is_pneumonia = None,
-        confidence = 0.0,
-        heatmap_url = None,
-        ai_model = "PneumoniaModel-v1",
+        is_pneumonia = prediction["is_pneumonia"],
+        confidence = prediction["confidence"],
+        heatmap_url = prediction["heatmap_url"],
+        ai_model = prediction["model_name"],
     )
 
     await db.execute(insert_stmt)

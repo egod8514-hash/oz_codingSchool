@@ -1,3 +1,4 @@
+from worker import model
 from typing import Optional
 from fastapi import APIRouter, Depends, Path, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,15 +22,13 @@ async def save_prediction(
     db : AsyncSession = Depends(async_get_db),
     current_user : UserModel = Depends(get_current_user),
 ) : 
-    gen = prediction_service.save_prediction_pre(
+    # 전처리 : 권한 여부, 데이터 유무 확인
+    prediction = prediction_service.save_prediction_pre(
         db,
         record_id,
         current_user,
-        "PneumoniaModel-v1", # TODO : ai모델명
+        model.MODEL_NAME,
     )
-    
-    # 전처리1
-    prediction = await anext(gen)
 
     if not prediction is None : 
         return {
@@ -39,23 +38,20 @@ async def save_prediction(
             "ai_model" : prediction.ai_model,
         }
 
-    # 전처리2
-    xray = await anext(gen)
+    # AI예측
+    # TODO : 병변 히트맵 이미지 URL
+    prediction = prediction_service.prediction()
 
-    # TODO : AI모델 실행
-    prediction_model = None
-
-    # AnalysisResultModel 결과 저장
-    prediction = prediction_service.save_prediction_post(
+    # 후처리 : AnalysisResultModel 결과 저장
+    prediction_service.save_prediction_post(
         db,
         record_id,
-        prediction_model,
+        prediction,
     )
 
     # 예측 결과 반환
     return {
-        "record_id" : prediction.record_id,
-        "is_pneumonia" : prediction.is_pneumonia,
-        "confidence" : prediction.confidence,
-        "ai_model" : prediction.ai_model,
+        "is_pneumonia" : prediction["is_pneumonia"],
+        "confidence" : prediction["confidence"],
+        "heatmap_url" : prediction["heatmap_url"],
     }
