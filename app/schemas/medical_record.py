@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class MedicalRecordCreateForm(BaseModel):
@@ -36,6 +36,16 @@ class MedicalRecordResponse(BaseModel):
     symptoms: str
     created_at: datetime
     xray_image_path: Optional[str] = None
+    xray_image_url: Optional[str] = None
+
+    @model_validator(mode="after")
+    def populate_xray_url(self) -> "MedicalRecordResponse":
+        path = self.xray_image_path or self.xray_image_url
+        if path:
+            normalized = "/" + path.lstrip("/")
+            if not self.xray_image_url:
+                self.xray_image_url = normalized
+        return self
 
 
 class DeletePatientResponse(BaseModel):

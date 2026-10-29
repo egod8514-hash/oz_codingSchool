@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import List
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -79,9 +80,6 @@ async def get_existing_prediction(
 
 # =========================================================
 # 실제 AI 폐렴 예측
-#
-# 기존 app/apis/prediction.py에서 네가 만들었던
-# X-ray 조회 → 이미지 읽기 → worker/model.py 실행 부분
 # =========================================================
 async def run_prediction(
     db: AsyncSession,
@@ -107,8 +105,9 @@ async def run_prediction(
             detail="등록된 X-ray 이미지가 없습니다.",
         )
 
-    # X-ray 파일 경로 확인
-    image_path = Path(xray.image_url)
+    # X-ray 파일 경로 확인 (앞에 '/'가 붙어있어도 로컬 상대 경로로 탐색)
+    raw_url = xray.image_url.lstrip("/")
+    image_path = Path(raw_url)
 
     if not image_path.exists():
         raise HTTPException(
@@ -127,9 +126,6 @@ async def run_prediction(
         )
 
     # 실제 AI 모델 실행
-    #
-    # 서버 시작 시 바로 PyTorch를 불러오지 않고
-    # 실제 예측 요청이 들어왔을 때 로딩한다.
     try:
         from worker.model import predictor
 
@@ -157,11 +153,7 @@ async def save_prediction(
         record_id=record_id,
         is_pneumonia=prediction["is_pneumonia"],
         confidence=prediction["confidence"],
-
-        # 현재 AnalysisResultModel에서 nullable=False이므로
-        # heatmap이 없는 경우 빈 문자열 저장
         heatmap_url=prediction.get("heatmap_url") or "",
-
         ai_model=prediction["model_name"],
     )
 
@@ -175,13 +167,6 @@ async def save_prediction(
 
 # =========================================================
 # POST 전체 처리
-#
-# 1. 권한 확인
-# 2. 진료기록 확인
-# 3. 같은 모델의 기존 결과 확인
-# 4. 없으면 AI 실행
-# 5. DB 저장
-# 6. 결과 반환
 # =========================================================
 async def execute_prediction(
     db: AsyncSession,
@@ -197,10 +182,6 @@ async def execute_prediction(
         record_id=record_id,
     )
 
-    # worker/model.py의 모델 이름 사용
-    #
-    # 여기서도 실제 모델 전체를 import하지 않고
-    # 모델 이름만 현재 프로젝트에서 사용하는 값과 맞춘다.
     ai_model = "PneumoniaModel-v1"
 
     # 같은 진료기록 + 같은 모델 결과가 이미 있는지 확인
@@ -220,10 +201,8 @@ async def execute_prediction(
         record_id=record_id,
     )
 
-    # AI 모델에서 실제 반환한 모델명 사용
     ai_model = prediction_result["model_name"]
 
-    # 혹시 모델명이 달라졌을 경우 한 번 더 중복 확인
     existing_prediction = await get_existing_prediction(
         db=db,
         record_id=record_id,
@@ -244,10 +223,7 @@ async def execute_prediction(
 
 
 # =========================================================
-# GET
-# 진료기록별 저장된 폐렴 예측 결과 조회
-#
-# AI 모델은 다시 실행하지 않는다.
+# GET: 진료기록별 저장된 폐렴 예측 결과 단건 조회
 # =========================================================
 async def get_prediction_result(
     db: AsyncSession,
@@ -282,6 +258,37 @@ async def get_prediction_result(
         )
 
     return make_prediction_response(prediction)
+
+
+# =========================================================
+# GET: 진료기록별 저장된 폐렴 예측 결과 전체 목록 조회 (프론트 호환)
+# =========================================================
+async def get_prediction_result_list(
+    db: AsyncSession,
+    record_id: int,
+    current_user: UserModel,
+) -> List[PredictionResponse]:
+
+    check_prediction_permission(current_user)
+
+    await get_medical_record(
+        db=db,
+        record_id=record_id,
+    )
+
+    stmt = (
+        select(AnalysisResultModel)
+        .where(
+            AnalysisResultModel.record_id == record_id,
+            AnalysisResultModel.is_deleted.is_(False),
+        )
+        .order_by(AnalysisResultModel.id.desc())
+    )
+
+    result = await db.execute(stmt)
+    predictions = result.scalars().all()
+
+    return [make_prediction_response(p) for p in predictions]
 
 
 # =========================================================
@@ -346,41 +353,38 @@ async def get_patient_xray_analysis_list(
     record_result = await db.execute(record_stmt)
     all_records = record_result.scalars().unique().all()
 
-    # 전체 개수는 pagination 적용 전 기준
     total_count = len(all_records)
-
-    # offset / limit 적용
     records = all_records[offset : offset + limit]
 
     items = []
 
     for record in records:
-
-        # 삭제되지 않은 X-ray
         xrays = [
             xray
             for xray in record.xray_images
             if not xray.is_deleted
         ]
-
-        # 가장 최근 X-ray
         latest_xray = (
             max(xrays, key=lambda x: x.id)
             if xrays
             else None
         )
 
-        # 삭제되지 않은 AI 분석 결과
         predictions = [
             prediction
             for prediction in record.analysis_results
             if not prediction.is_deleted
         ]
-
-        # 가장 최근 AI 분석 결과
         latest_prediction = (
             max(predictions, key=lambda x: x.id)
             if predictions
+            else None
+        )
+
+        raw_xray_url = latest_xray.image_url if latest_xray else None
+        normalized_xray_url = (
+            "/" + raw_xray_url.lstrip("/")
+            if raw_xray_url
             else None
         )
 
@@ -388,60 +392,15 @@ async def get_patient_xray_analysis_list(
             record_id=record.id,
             chart_number=record.chart_number,
             symptoms=record.symptoms,
-
-            xray_id=(
-                latest_xray.id
-                if latest_xray
-                else None
-            ),
-
-            xray_image_url=(
-                latest_xray.image_url
-                if latest_xray
-                else None
-            ),
-
-            shooting_datetime=(
-                latest_xray.shooting_datetime
-                if latest_xray
-                else None
-            ),
-
-            prediction_id=(
-                latest_prediction.id
-                if latest_prediction
-                else None
-            ),
-
-            is_pneumonia=(
-                latest_prediction.is_pneumonia
-                if latest_prediction
-                else None
-            ),
-
-            confidence=(
-                float(latest_prediction.confidence)
-                if latest_prediction
-                else None
-            ),
-
-            heatmap_url=(
-                (latest_prediction.heatmap_url or None)
-                if latest_prediction
-                else None
-            ),
-
-            ai_model=(
-                latest_prediction.ai_model
-                if latest_prediction
-                else None
-            ),
-
-            analyzed_at=(
-                latest_prediction.created_at
-                if latest_prediction
-                else None
-            ),
+            xray_id=latest_xray.id if latest_xray else None,
+            xray_image_url=normalized_xray_url,
+            shooting_datetime=latest_xray.shooting_datetime if latest_xray else None,
+            prediction_id=latest_prediction.id if latest_prediction else None,
+            is_pneumonia=latest_prediction.is_pneumonia if latest_prediction else None,
+            confidence=float(latest_prediction.confidence) if latest_prediction else None,
+            heatmap_url=(latest_prediction.heatmap_url or None) if latest_prediction else None,
+            ai_model=latest_prediction.ai_model if latest_prediction else None,
+            analyzed_at=latest_prediction.created_at if latest_prediction else None,
         )
 
         items.append(item)

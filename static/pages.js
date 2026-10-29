@@ -62,7 +62,7 @@ const pages = {
                 <td>${p.id}</td>
                 <td>${p.name}</td>
                 <td>${p.age}</td>
-                <td>${p.gender === 'male' ? '남성' : '여성'}</td>
+                <td>${(p.gender === 'male' || p.gender === 'M') ? '남성' : '여성'}</td>
                 <td>${utils.formatPhoneNumber(p.phone_number)}</td>
                 <td><button onclick="navigate('/patients/${p.id}')">상세보기</button></td>
             </tr>
@@ -82,13 +82,20 @@ const pages = {
     async renderPatientDetail(patientId) {
         const patient = await apis.getPatient(patientId);
         const records = await apis.getPatientMedicalRecords(patientId);
+        const predictions = await apis.getPatientPredictions(patientId);
+        const predMap = {};
+        for (const item of predictions) {
+            predMap[item.record_id] = item;
+        }
+
         const html = await utils.loadTemplate('patient-detail');
         if (!state.currentPage.startsWith('/patients/')) return;
         const app = document.getElementById('app');
         app.innerHTML = html;
         
         // 환자 정보 표시
-        document.getElementById('patient-name').innerText = `${patient.name} (${patient.gender === 'male' ? '남성' : '여성'})`;
+        const genderLabel = (patient.gender === 'male' || patient.gender === 'M') ? '남성' : '여성';
+        document.getElementById('patient-name').innerText = `${patient.name} (${genderLabel})`;
         document.getElementById('patient-info').innerText = `나이: ${patient.age}세 | 연락처: ${utils.formatPhoneNumber(patient.phone_number)}`;
         
         // 수정 폼 초기값 설정
@@ -107,15 +114,30 @@ const pages = {
         state.currentPatientId = patientId;
 
         const listBody = document.getElementById('records-list');
-        listBody.innerHTML = records.map(r => `
-            <tr>
-                <td>${r.id}</td>
-                <td>${r.chart_number}</td>
-                <td>${r.symptoms}</td>
-                <td>${new Date(r.created_at).toLocaleString()}</td>
-                <td><button onclick="navigate('/medical-records/${r.id}')">상세보기</button></td>
-            </tr>
-        `).join('');
+        if (records.length === 0) {
+            listBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">등록된 진료 기록이 없습니다.</td></tr>';
+            return;
+        }
+        listBody.innerHTML = records.map(r => {
+            const pred = predMap[r.id];
+            let predBadge = '<span class="status-badge">미분석</span>';
+            if (pred && pred.is_pneumonia !== null && pred.is_pneumonia !== undefined) {
+                const confPct = pred.confidence <= 1 ? (pred.confidence * 100).toFixed(2) : Number(pred.confidence).toFixed(2);
+                predBadge = pred.is_pneumonia
+                    ? `<span class="status-badge error">Positive (${confPct}%)</span>`
+                    : `<span class="status-badge success">Negative (${confPct}%)</span>`;
+            }
+            return `
+                <tr>
+                    <td>${r.id}</td>
+                    <td>${r.chart_number}</td>
+                    <td>${r.symptoms}</td>
+                    <td>${predBadge}</td>
+                    <td>${new Date(r.created_at).toLocaleString()}</td>
+                    <td><button onclick="navigate('/medical-records/${r.id}')">상세보기</button></td>
+                </tr>
+            `;
+        }).join('');
     },
 
     async renderRecordCreate(patientId) {
@@ -154,7 +176,8 @@ const pages = {
         document.getElementById('chart-number').innerText = record.chart_number;
         document.getElementById('symptoms-text').innerText = record.symptoms;
         document.getElementById('created-at').innerText = new Date(record.created_at).toLocaleString();
-        document.getElementById('xray-img').src = record.xray_image_url;
+        const rawImg = record.xray_image_url || record.xray_image_path || '';
+        document.getElementById('xray-img').src = rawImg ? ('/' + rawImg.replace(/^\/+/, '')) : '';
         
         document.getElementById('predict-btn').onclick = () => this.handlePredict(recordId);
         document.getElementById('back-to-patient-btn').onclick = () => navigate(`/patients/${record.patient_id}`);
@@ -174,14 +197,17 @@ const pages = {
                         </tr>
                     </thead>
                     <tbody>
-                        ${analyses.map(a => `
-                            <tr class="${a.is_pneumonia ? 'result-positive' : 'result-negative'}">
-                                <td>${new Date(a.created_at).toLocaleString()}</td>
-                                <td><strong>${a.is_pneumonia ? 'Positive' : 'Negative'}</strong></td>
-                                <td>${a.confidence}%</td>
-                                <td>${a.ai_model}</td>
-                            </tr>
-                        `).join('')}
+                        ${analyses.map(a => {
+                            const confPct = a.confidence <= 1 ? (a.confidence * 100).toFixed(2) : Number(a.confidence).toFixed(2);
+                            return `
+                                <tr class="${a.is_pneumonia ? 'result-positive' : 'result-negative'}">
+                                    <td>${new Date(a.created_at).toLocaleString()}</td>
+                                    <td><strong>${a.is_pneumonia ? 'Positive' : 'Negative'}</strong></td>
+                                    <td>${confPct}%</td>
+                                    <td>${a.ai_model}</td>
+                                </tr>
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
             `;
@@ -197,12 +223,13 @@ const pages = {
         document.getElementById('me-email').innerText = state.user.email;
         document.getElementById('me-name-display').innerText = state.user.name;
         document.getElementById('me-department-display').innerText = state.user.department;
-        document.getElementById('me-gender-display').innerText = state.user.gender === 'male' ? '남성' : '여성';
+        document.getElementById('me-gender-display').innerText = (state.user.gender === 'male' || state.user.gender === 'M') ? '남성' : '여성';
         document.getElementById('me-phone-display').innerText = utils.formatPhoneNumber(state.user.phone_number);
         document.getElementById('me-role-display').innerText = state.user.role;
 
         // 수정 폼 초기값 설정
-        document.getElementById('update-me-department').value = state.user.department;
+        const deptSelectMap = { 'DEV': 'developer', 'MEDICAL': 'medical team', 'RESEARCH': 'researcher' };
+        document.getElementById('update-me-department').value = deptSelectMap[state.user.department] || state.user.department;
         document.getElementById('update-me-phone').value = utils.formatPhoneNumber(state.user.phone_number);
         
         const mePhoneInput = document.getElementById('update-me-phone');

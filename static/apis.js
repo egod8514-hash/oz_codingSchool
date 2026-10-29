@@ -302,7 +302,7 @@ const apis = {
      * [REQ-PRED-001] 진료기록에 등록된 X-ray 이미지를 활용하여 폐렴 여부를 예측한다.
      */
     async predictPneumonia(recordId) {
-        return await this.request(`/medical-records/${recordId}/predict`, { method: 'POST' });
+        return await this.request(`/medical-records/${recordId}/predictions`, { method: 'POST' });
     },
 
     /**
@@ -310,9 +310,21 @@ const apis = {
      * [REQ-PRED-002] 특정 진료기록에 대해 수행된 모든 AI 예측 결과 목록을 조회한다.
      */
     async getMedicalRecordAnalyses(recordId) {
-        const res = await this.request(`/medical-records/${recordId}/analyses`);
+        const res = await this.request(`/medical-records/${recordId}/analyses`, {}, true);
         if (Array.isArray(res)) return res;
         if (res && Array.isArray(res.analyses)) return res.analyses;
+        if (res && Array.isArray(res.predictions)) return res.predictions;
+        if (res && res.record_id) return [res];
+        return [];
+    },
+
+    /**
+     * 환자별 X-ray 및 AI 예측 결과 목록 조회 (팀원 4 API)
+     */
+    async getPatientPredictions(patientId) {
+        const res = await this.request(`/patients/${patientId}/predictions`, {}, true);
+        if (Array.isArray(res)) return res;
+        if (res && Array.isArray(res.predictions)) return res.predictions;
         return [];
     },
 

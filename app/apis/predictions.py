@@ -1,3 +1,4 @@
+from typing import List
 from fastapi import APIRouter, Depends, Path, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,6 +27,12 @@ router = APIRouter(
     status_code=status.HTTP_200_OK,
     summary="폐렴 AI 예측 실행",
 )
+@router.post(
+    "/medical-records/{record_id}/predict",
+    response_model=PredictionResponse,
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False,
+)
 async def execute_pneumonia_prediction(
     record_id: int = Path(..., ge=1, description="진료기록 ID"),
     db: AsyncSession = Depends(async_get_db),
@@ -37,18 +44,15 @@ async def execute_pneumonia_prediction(
     같은 진료기록에 같은 AI 모델의 예측 결과가 이미 존재하면
     AI 모델을 다시 실행하지 않고 기존 DB 결과를 반환합니다.
     """
-
-    prediction = await prediction_service.execute_prediction(
+    return await prediction_service.execute_prediction(
         db=db,
         record_id=record_id,
         current_user=current_user,
     )
 
-    return prediction
-
 
 # =========================================================
-# 2. 진료기록별 폐렴 예측 결과 조회
+# 2. 진료기록별 폐렴 예측 결과 단건 조회
 # =========================================================
 @router.get(
     "/medical-records/{record_id}/predictions",
@@ -63,18 +67,39 @@ async def get_prediction_result(
 ):
     """
     해당 진료기록에 저장되어 있는 폐렴 AI 예측 결과를 조회합니다.
-
-    이 API에서는 AI 모델을 다시 실행하지 않습니다.
-    DB에 저장된 결과만 반환합니다.
+    이 API에서는 AI 모델을 다시 실행하지 않으며 DB에 저장된 결과만 반환합니다.
     """
-
-    prediction = await prediction_service.get_prediction_result(
+    return await prediction_service.get_prediction_result(
         db=db,
         record_id=record_id,
         current_user=current_user,
     )
 
-    return prediction
+
+# =========================================================
+# 2-1. 진료기록별 폐렴 예측 결과 목록 조회 (프론트엔드 호환)
+# =========================================================
+@router.get(
+    "/medical-records/{record_id}/analyses",
+    response_model=List[PredictionResponse],
+    status_code=status.HTTP_200_OK,
+    summary="진료기록별 폐렴 예측 결과 목록 조회 (프론트 호환)",
+    include_in_schema=False,
+)
+async def get_prediction_result_list(
+    record_id: int = Path(..., ge=1, description="진료기록 ID"),
+    db: AsyncSession = Depends(async_get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """
+    프론트엔드 진료기록 상세 페이지에서 예측 결과 목록을 조회할 때 사용합니다.
+    아직 예측 결과가 없는 경우 404 에러 대신 빈 배열([])을 반환합니다.
+    """
+    return await prediction_service.get_prediction_result_list(
+        db=db,
+        record_id=record_id,
+        current_user=current_user,
+    )
 
 
 # =========================================================
@@ -85,6 +110,12 @@ async def get_prediction_result(
     response_model=PatientXrayAnalysisListResponse,
     status_code=status.HTTP_200_OK,
     summary="환자별 X-ray 및 AI 예측 결과 목록 조회",
+)
+@router.get(
+    "/patients/{patient_id}/analyses",
+    response_model=PatientXrayAnalysisListResponse,
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False,
 )
 async def get_patient_prediction_list(
     patient_id: int = Path(..., ge=1, description="환자 ID"),
@@ -106,13 +137,10 @@ async def get_patient_prediction_list(
     선택한 환자의 진료기록을 기준으로
     X-ray 이미지와 폐렴 AI 예측 결과 목록을 조회합니다.
     """
-
-    result = await prediction_service.get_patient_xray_analysis_list(
+    return await prediction_service.get_patient_xray_analysis_list(
         db=db,
         patient_id=patient_id,
         current_user=current_user,
         limit=limit,
         offset=offset,
     )
-
-    return result

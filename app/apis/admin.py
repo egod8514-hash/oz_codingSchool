@@ -4,8 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db.databases import async_get_db
 from app.core.dependencies import require_admin
 from app.models.users import UserModel
-from app.core.enum.enum_department import DepartmentEnum
 from app.schemas.admin import AdminUserListResponse, AdminUserResponse, AdminRoleUpdateRequest
+from app.schemas.auth import DEPARTMENT_MAP
 from app.services import admin_service
 
 
@@ -37,14 +37,25 @@ def _to_admin_user_response(u: UserModel) -> AdminUserResponse:
 )
 async def get_users(
     search: str | None = None,
-    department: DepartmentEnum | None = None,
+    query: str | None = None,
+    department: str | None = None,
     db: AsyncSession = Depends(async_get_db),
     admin_user: UserModel = Depends(require_admin),
 ):
+    search_keyword = search or query
+    dept_enum = None
+    if department:
+        raw_dept = department.strip()
+        upper_dept = raw_dept.upper()
+        if upper_dept in DEPARTMENT_MAP:
+            dept_enum = DEPARTMENT_MAP[upper_dept]
+        elif raw_dept in DEPARTMENT_MAP:
+            dept_enum = DEPARTMENT_MAP[raw_dept]
+
     users = await admin_service.get_users(
         db=db,
-        search=search,
-        department=department,
+        search=search_keyword,
+        department=dept_enum,
     )
 
     return {
