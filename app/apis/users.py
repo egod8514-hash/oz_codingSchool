@@ -1,7 +1,9 @@
+import re
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Body, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func
+from pydantic import BaseModel, Field
 
 from app.core.db.databases import async_get_db
 from app.core.dependencies import get_current_user
@@ -11,9 +13,9 @@ from app.schemas.auth import (
     SignupRequest,
     SignupResponse,
     LoginResponse,
+    DEPARTMENT_MAP,
 )
 from app.services import auth_service
-from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/v1/users", tags=["Users"])
 
@@ -110,25 +112,27 @@ async def update_my_profile(
     current_user: UserModel = Depends(get_current_user),
     db: AsyncSession = Depends(async_get_db),
 ):
-    from app.core.enum.enum_department import DepartmentEnum
     if body.department:
-        clean_dept = body.department.strip().upper()
-        dept_map = {
-            "의료": DepartmentEnum.MEDICAL,
-            "MEDICAL": DepartmentEnum.MEDICAL,
-            "개발": DepartmentEnum.DEV,
-            "DEV": DepartmentEnum.DEV,
-            "연구": DepartmentEnum.RESEARCH,
-            "RESEARCH": DepartmentEnum.RESEARCH,
-        }
-        if body.department.strip() in dept_map:
-            current_user.department = dept_map[body.department.strip()]
-        elif clean_dept in dept_map:
-            current_user.department = dept_map[clean_dept]
+        raw_dept = body.department.strip()
+        upper_dept = raw_dept.upper()
+        if upper_dept in DEPARTMENT_MAP:
+            current_user.department = DEPARTMENT_MAP[upper_dept]
+        elif raw_dept in DEPARTMENT_MAP:
+            current_user.department = DEPARTMENT_MAP[raw_dept]
 
     new_phone = body.phone_number or body.phone
     if new_phone:
-        current_user.phone_number = new_phone.strip()
+        digits = re.sub(r"[^\d]", "", str(new_phone))
+        if len(digits) == 11:
+            formatted_phone = f"{digits[:3]}-{digits[3:7]}-{digits[7:]}"
+        elif len(digits) == 10:
+            if digits.startswith("02"):
+                formatted_phone = f"{digits[:2]}-{digits[2:6]}-{digits[6:]}"
+            else:
+                formatted_phone = f"{digits[:3]}-{digits[3:6]}-{digits[6:]}"
+        else:
+            formatted_phone = str(new_phone).strip()
+        current_user.phone_number = formatted_phone
 
     await db.commit()
     await db.refresh(current_user)
