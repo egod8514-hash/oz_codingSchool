@@ -6,31 +6,25 @@
 
 -> 예측을 새로 실행하지 않고 DB에 저장된 결과만 조회하도록 처리
 
+
 1) API 주요 구현 사안
 
-•
-기능: 특정 진료기록의 폐렴 예측 결과 조회
+• 기능: 특정 진료기록의 폐렴 예측 결과 조회
 
-•
-Method / Path: GET /api/v1/medical-records/{record_id}/predictions
+• Method / Path: GET /api/v1/medical-records/{record_id}/predictions
 
-•
-응답 내용: 폐렴 여부, confidence, 사용 모델명, 생성 일시
+• 응답 내용: 폐렴 여부, confidence, 사용 모델명, 생성 일시
 
 
 2) 처리 흐름
 
-1.
-record_id로 진료기록 존재 여부 확인
+1. record_id로 진료기록 존재 여부 확인
 
-2.
-저장된 폐렴 예측 결과 조회
+2. 저장된 폐렴 예측 결과 조회
 
-3.
-예측 결과가 없으면 404 Not Found 반환
+3. 예측 결과가 없으면 404 Not Found 반환
 
-4.
-조회된 결과를 응답 형식에 맞춰 반환
+4. 조회된 결과를 응답 형식에 맞춰 반환
 
 
 3) 테스트 및 결과
